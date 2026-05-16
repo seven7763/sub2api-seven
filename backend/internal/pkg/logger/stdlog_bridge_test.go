@@ -19,6 +19,11 @@ func TestInferStdLogLevel(t *testing.T) {
 		{msg: "[OpenAI WS Mode] reconnect_retry account_id=22 retry=1 max_retries=5", want: LevelInfo},
 		{msg: "service started", want: LevelInfo},
 		{msg: "debug: cache miss", want: LevelDebug},
+		// [Warn] prefix must win even when the message body contains
+		// the substring "error" (e.g. an upstream HTTP error code rendered
+		// into a benign event log). Regression for GeminiOAuth Drive API
+		// 403 being misclassified as ERROR.
+		{msg: "[Warn] [GeminiOAuth] Drive API scope not available (403): drive API error: status 403", want: LevelWarn},
 	}
 
 	for _, tc := range cases {

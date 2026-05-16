@@ -368,9 +368,12 @@ func (s *GeminiOAuthService) FetchGoogleOneTier(ctx context.Context, accessToken
 
 	storageInfo, err := s.driveClient.GetStorageQuota(ctx, accessToken, proxyURL)
 	if err != nil {
-		// Check if it's a 403 (scope not granted)
+		// Check if it's a 403 (scope not granted).
+		// This is an expected condition for Google One personal accounts that did
+		// not grant the drive.readonly scope at OAuth time, so log it as WARN
+		// rather than ERROR to keep alerting clean.
 		if strings.Contains(err.Error(), "status 403") {
-			logger.LegacyPrintf("service.gemini_oauth", "[GeminiOAuth] Drive API scope not available (403): %v", err)
+			logger.LegacyPrintf("service.gemini_oauth", "[Warn] [GeminiOAuth] Drive API scope not available (403): %v", err)
 			return GeminiTierGoogleOneUnknown, nil, err
 		}
 		// Other errors
