@@ -20,8 +20,10 @@ FROM ${NODE_IMAGE} AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install pnpm — pin to v9 because pnpm 10 hard-fails the build if any dep
+# (esbuild / vue-demi) has a postinstall script not explicitly approved via
+# `pnpm.onlyBuiltDependencies`. v9 was the major when 0.1.126 shipped.
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 # Install dependencies first (better caching)
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
