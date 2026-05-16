@@ -14,9 +14,13 @@ releases.
 | `patches/vX.Y.Z` | Upstream tag `vX.Y.Z` + this fork's local patches. One branch per release we deploy. The newest one is what production runs. |
 | `vX.Y.Z-seven.N` (tag) | Optional release tag stamped after a successful build (e.g. `v0.1.126-seven.1`). |
 
-The deployed Docker image tag follows the branch:
-`weishaw/sub2api:0.1.126-patched` (or `seven7763/sub2api:0.1.126-seven.1`
-once we push to a registry of our own).
+The deployed Docker image tag follows the branch and carries a
+build-round suffix:
+`weishaw/sub2api:0.1.126-patched` for the first build of a branch,
+then `…-patched-r2`, `…-patched-r3`, … if we add more commits to the
+same `patches/v0.1.126` branch and rebuild. Old `-rN` images are
+left on the host as rollback targets — they take ~100 MB each, prune
+them with `docker image rm` once a new round has stabilised.
 
 ## Local patches in this fork
 
@@ -28,6 +32,9 @@ is easy to cherry-pick onto a future upstream release.
 | `fix(apicompat): accept array form of function_call_output.output` | `ResponsesInputItem.Output` was typed `string`, but the OpenAI Responses spec also accepts an array of typed parts. Strict clients (e.g. some OpenAI SDK paths sending image/text tool results) tripped `cannot unmarshal array into Go struct field …Output of type string` and got HTTP 422. |
 | `feat(channels): collapse supported-models when more than 12` | The windsurf channel exposes ~78 models; the available-channels page rendered them all inline, blowing one row up to ~9 wrapped lines and pushing the rest of the table off the visible screen. Default-collapsed with a `+N more` toggle. |
 | `build(docker): pin pnpm to 9.15.4` | `corepack prepare pnpm@latest` now resolves to v10.x, which hard-fails on `ERR_PNPM_IGNORED_BUILDS` (esbuild / vue-demi). Pinning v9 keeps the upstream Dockerfile untouched in spirit. |
+| `test(handler): canonicalise t.TempDir() prefix on macOS` | `TestResolvePageImagePath` failed on macOS because `t.TempDir()` returns `/var/folders/…` but production code calls `filepath.EvalSymlinks` to defeat symlink-escape attacks, which canonicalises the prefix to `/private/var/…`. Run `EvalSymlinks` in the test once so string compares match cross-platform. |
+| `fix(gemini): downgrade expected Drive API 403 to WARN` | `FetchGoogleOneTier` calls Drive on every probe; personal Google One accounts that did not grant `drive.readonly` legitimately return 403. The legacy-printf level inference escalated the message to ERROR because it contained the substring `error`, so every dormant gemini OAuth account produced 100% of our ERROR log volume. Prefix the message with `[Warn]` so `inferStdLogLevel` routes it to WARN. |
+| `fix(deploy): 移除数据库与 Redis 宿主机端口映射` | Upstream `18790386` cherry-picked. Removes the host-side `5432:5432` / `6379:6379` mappings from `deploy/docker-compose.yml` so postgres/redis are not exposed on the public interface. Our running production compose already has this fix applied manually; this commit keeps the fork's template in sync for any future fresh deploy. |
 
 When upstream finally lands an equivalent fix, drop the corresponding
 commit from the next `patches/*` branch.
