@@ -971,6 +971,10 @@ export default {
       groups: 'Your Accessible Groups',
       supportedModels: 'Supported Models'
     },
+    collapse: {
+      expand: '+{count} more',
+      collapse: 'Collapse'
+    },
     pricing: {
       billingMode: 'Billing Mode',
       billingModeToken: 'Per Token',

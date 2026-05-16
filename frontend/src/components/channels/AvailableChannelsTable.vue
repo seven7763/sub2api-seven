@@ -122,11 +122,12 @@
             </div>
           </td>
 
-          <!-- 支持模型 -->
+          <!-- 支持模型：模型数量超过阈值时默认折叠，避免单行被撑成 8+ 行高
+               一眼看不到下面的内容；点"展开/收起"切换。 -->
           <td class="align-top px-4 py-3">
-            <div class="flex flex-wrap gap-1">
+            <div class="flex flex-wrap items-center gap-1">
               <SupportedModelChip
-                v-for="m in section.supported_models"
+                v-for="m in visibleModels(channel, section)"
                 :key="`${section.platform}-${m.name}`"
                 :model="m"
                 :pricing-key-prefix="pricingKeyPrefix"
@@ -134,6 +135,20 @@
                 :show-platform="false"
                 :platform-hint="section.platform"
               />
+              <button
+                v-if="section.supported_models.length > collapseThreshold"
+                type="button"
+                class="inline-flex items-center gap-0.5 rounded-md border border-dashed border-gray-300 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 hover:border-gray-400 hover:bg-gray-100 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700"
+                @click="toggleExpand(channel, section)"
+              >
+                <Icon
+                  :name="isExpanded(channel, section) ? 'chevronUp' : 'chevronDown'"
+                  size="xs"
+                  class="h-3 w-3"
+                />
+                <span v-if="isExpanded(channel, section)">{{ collapseLabel }}</span>
+                <span v-else>{{ expandLabel(section.supported_models.length - collapseThreshold) }}</span>
+              </button>
               <span v-if="section.supported_models.length === 0" class="text-xs text-gray-400">
                 {{ noModelsLabel }}
               </span>
@@ -146,12 +161,18 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import SupportedModelChip from './SupportedModelChip.vue'
-import type { UserAvailableChannel, UserAvailableGroup, UserChannelPlatformSection } from '@/api/channels'
+import type {
+  UserAvailableChannel,
+  UserAvailableGroup,
+  UserChannelPlatformSection,
+  UserSupportedModel,
+} from '@/api/channels'
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import { platformBadgeClass } from '@/utils/platformColors'
 
@@ -185,5 +206,52 @@ function exclusiveGroups(section: UserChannelPlatformSection): UserAvailableGrou
 
 function publicGroups(section: UserChannelPlatformSection): UserAvailableGroup[] {
   return section.groups.filter((g) => !g.is_exclusive)
+}
+
+// ── Supported-models collapse ───────────────────────────────────────
+// Some channels (notably the windsurf bundle) expose 70+ models. Rendering
+// them all inline turns one table row into 8–9 wrapped lines and pushes the
+// rest of the page far below the fold. Default to a compact view; let the
+// user expand on demand.
+const collapseThreshold = 12
+
+const expandedKeys = ref<Set<string>>(new Set())
+
+function sectionKey(channel: UserAvailableChannel, section: UserChannelPlatformSection): string {
+  return `${channel.name}::${section.platform}`
+}
+
+function isExpanded(channel: UserAvailableChannel, section: UserChannelPlatformSection): boolean {
+  return expandedKeys.value.has(sectionKey(channel, section))
+}
+
+function toggleExpand(channel: UserAvailableChannel, section: UserChannelPlatformSection): void {
+  const key = sectionKey(channel, section)
+  const next = new Set(expandedKeys.value)
+  if (next.has(key)) {
+    next.delete(key)
+  } else {
+    next.add(key)
+  }
+  expandedKeys.value = next
+}
+
+function visibleModels(
+  channel: UserAvailableChannel,
+  section: UserChannelPlatformSection,
+): UserSupportedModel[] {
+  if (
+    section.supported_models.length <= collapseThreshold ||
+    isExpanded(channel, section)
+  ) {
+    return section.supported_models
+  }
+  return section.supported_models.slice(0, collapseThreshold)
+}
+
+const collapseLabel = computed(() => t('availableChannels.collapse.collapse'))
+
+function expandLabel(remaining: number): string {
+  return t('availableChannels.collapse.expand', { count: remaining })
 }
 </script>

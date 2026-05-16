@@ -975,6 +975,10 @@ export default {
       groups: '我可访问的分组',
       supportedModels: '支持模型'
     },
+    collapse: {
+      expand: '+{count} 展开',
+      collapse: '收起'
+    },
     pricing: {
       billingMode: '计费模式',
       billingModeToken: '按 Token',
