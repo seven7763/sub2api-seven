@@ -42,6 +42,13 @@ func TestCleanPageImageRelativePath(t *testing.T) {
 
 func TestResolvePageImagePath(t *testing.T) {
 	root := t.TempDir()
+	// On macOS t.TempDir() lives under /var/folders/..., but /var is a
+	// symlink to /private/var. Production code uses filepath.EvalSymlinks
+	// to defeat symlink escapes, which canonicalises the prefix; mirror
+	// that here so string comparisons work cross-platform.
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		root = resolved
+	}
 	pagesDir := filepath.Join(root, "pages")
 	base := filepath.Join(pagesDir, "guide")
 	if err := os.MkdirAll(filepath.Join(base, "images"), 0755); err != nil {
