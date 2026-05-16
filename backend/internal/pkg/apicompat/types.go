@@ -214,7 +214,11 @@ type ResponsesInputItem struct {
 	ID        string `json:"id,omitempty"`
 
 	// type=function_call_output
-	Output string `json:"output,omitempty"`
+	// The OpenAI Responses API allows `output` to be either a plain string
+	// (legacy) or an array of content parts (modern, supports multimodal
+	// tool results). Use json.RawMessage so we can decode both shapes; see
+	// flattenResponsesFunctionCallOutput in responses_to_anthropic_request.go.
+	Output json.RawMessage `json:"output,omitempty"`
 }
 
 // ResponsesContentPart is a typed content part in a Responses message.

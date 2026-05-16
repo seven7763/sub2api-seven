@@ -214,7 +214,7 @@ func anthropicUserToResponses(raw json.RawMessage) ([]ResponsesInputItem, error)
 		out = append(out, ResponsesInputItem{
 			Type:   "function_call_output",
 			CallID: toResponsesCallID(b.ToolUseID),
-			Output: outputText,
+			Output: responsesFunctionCallOutputFromString(outputText),
 		})
 		toolResultImageParts = append(toolResultImageParts, imageParts...)
 	}

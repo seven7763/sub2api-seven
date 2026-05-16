@@ -144,8 +144,10 @@ func convertResponsesInputToAnthropic(inputRaw json.RawMessage) (json.RawMessage
 			})
 
 		case item.Type == "function_call_output":
-			// function_call_output → user message with tool_result block
-			outputContent := item.Output
+			// function_call_output → user message with tool_result block.
+			// `output` may be a plain string (legacy) or an array of content
+			// parts (modern). flattenResponsesFunctionCallOutput handles both.
+			outputContent := flattenResponsesFunctionCallOutput(item.Output)
 			if outputContent == "" {
 				outputContent = "(empty)"
 			}
@@ -304,6 +306,66 @@ func convertResponsesAssistantToAnthropicContent(raw json.RawMessage) (json.RawM
 		blocks = append(blocks, AnthropicContentBlock{Type: "text", Text: ""})
 	}
 	return json.Marshal(blocks)
+}
+
+// responsesFunctionCallOutputFromString wraps a plain string into the
+// json.RawMessage form expected by ResponsesInputItem.Output. Used by the
+// Anthropic→Responses and ChatCompletions→Responses converters which always
+// emit the legacy string shape.
+func responsesFunctionCallOutputFromString(s string) json.RawMessage {
+	b, err := json.Marshal(s)
+	if err != nil {
+		// json.Marshal of a string never fails in practice; fall back to an
+		// empty JSON string to keep callers panic-free.
+		return json.RawMessage(`""`)
+	}
+	return b
+}
+
+// flattenResponsesFunctionCallOutput converts a function_call_output's
+// `output` field into a flat text string suitable for Anthropic's tool_result
+// content. The OpenAI Responses API accepts three shapes here:
+//
+//  1. Legacy string: "result of tool"
+//  2. Array of content parts: [{"type":"output_text","text":"..."}, ...]
+//  3. (Defensive) a single bare content part object.
+//
+// Anything that doesn't match one of those shapes degrades to an empty
+// string so the caller can replace it with the "(empty)" placeholder.
+func flattenResponsesFunctionCallOutput(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	// Form 1: plain string.
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+
+	// Form 2: array of content parts.
+	var parts []ResponsesContentPart
+	if err := json.Unmarshal(raw, &parts); err == nil {
+		var b strings.Builder
+		for _, p := range parts {
+			switch p.Type {
+			case "output_text", "input_text", "text":
+				b.WriteString(p.Text)
+			}
+		}
+		return b.String()
+	}
+
+	// Form 3: single content part object.
+	var part ResponsesContentPart
+	if err := json.Unmarshal(raw, &part); err == nil {
+		switch part.Type {
+		case "output_text", "input_text", "text":
+			return part.Text
+		}
+	}
+
+	return ""
 }
 
 // fromResponsesCallIDToAnthropic converts an OpenAI function call ID back to
